@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background -->
+  <circle cx="256" cy="256" r="256" fill="#0f172a"/>
+
+  <!-- Trend line (AI adoption curve) -->
+  <g opacity="0.3">
+    <polyline points="80,360 160,340 220,310 270,250 310,200 360,120 420,80" stroke="#3b82f6" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Data points on the trend -->
+    <circle cx="160" cy="340" r="4" fill="#3b82f6"/>
+    <circle cx="220" cy="310" r="4" fill="#3b82f6"/>
+    <circle cx="270" cy="250" r="4" fill="#3b82f6"/>
+    <circle cx="310" cy="200" r="4" fill="#3b82f6"/>
+    <circle cx="360" cy="120" r="4" fill="#3b82f6"/>
+  </g>
+
+  <!-- Magnifying glass (research / analysis) -->
+  <g transform="translate(220, 220)">
+    <!-- Glass circle -->
+    <circle cx="0" cy="0" r="90" stroke="#94a3b8" stroke-width="4" fill="#1e293b" fill-opacity="0.6"/>
+    <circle cx="0" cy="0" r="90" stroke="url(#lensGlow)" stroke-width="2" fill="none"/>
+
+    <!-- Lens highlight -->
+    <ellipse cx="-30" cy="-30" rx="25" ry="15" fill="#e2e8f0" opacity="0.08" transform="rotate(-30 -30 -30)"/>
+
+    <!-- Handle -->
+    <line x1="64" y1="64" x2="140" y2="140" stroke="#94a3b8" stroke-width="10" stroke-linecap="round"/>
+    <line x1="64" y1="64" x2="140" y2="140" stroke="#475569" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <!-- Upward arrow inside lens (opportunity / growth) -->
+  <g transform="translate(220, 220)">
+    <path d="M0 30 L0 -40" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
+    <path d="M-18 -20 L0 -45 L18 -20" stroke="#3b82f6" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Small bar chart base -->
+    <rect x="-35" y="10" width="14" height="22" rx="2" fill="#3b82f6" opacity="0.5"/>
+    <rect x="-7" y="-2" width="14" height="34" rx="2" fill="#3b82f6" opacity="0.65"/>
+    <rect x="21" y="-16" width="14" height="48" rx="2" fill="#3b82f6" opacity="0.8"/>
+  </g>
+
+  <!-- Pen nib (writing / blogging) -->
+  <g transform="translate(140, 390)">
+    <path d="M0 -30 L-8 0 L0 12 L8 0 Z" fill="#94a3b8"/>
+    <line x1="0" y1="-18" x2="0" y2="12" stroke="#0f172a" stroke-width="1"/>
+    <path d="M-2 6 L0 12 L2 6" fill="#e2e8f0"/>
+  </g>
+
+  <defs>
+    <radialGradient id="lensGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.4"/>
+    </radialGradient>
+  </defs>
+</svg>

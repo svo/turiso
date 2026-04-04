@@ -1,0 +1,22 @@
+- name: Determine architecture
+  ansible.builtin.set_fact:
+    goplaces_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
+
+- name: Download GoPlaces binary
+  ansible.builtin.get_url:
+    url: 'https://github.com/steipete/goplaces/releases/download/v0.3.0/goplaces_0.3.0_linux_{{ goplaces_arch }}.tar.gz'
+    dest: '/tmp/goplaces.tar.gz'
+    mode: '0644'
+  become: true
+
+- name: Extract GoPlaces binary
+  ansible.builtin.unarchive:
+    src: '/tmp/goplaces.tar.gz'
+    dest: '/usr/local/bin/'
+    remote_src: true
+    mode: '0755'
+  become: true
+
+- name: Verify installation
+  ansible.builtin.command: '/usr/local/bin/goplaces --version'
+  changed_when: false
