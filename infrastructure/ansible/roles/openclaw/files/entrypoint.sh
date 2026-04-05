@@ -44,6 +44,12 @@ node -e "
   delete config.tools.allow;
   config.tools.deny = ['gateway'];
   delete config.agent;
+  config.browser = {
+    enabled: true,
+    headless: true,
+    noSandbox: true,
+    executablePath: '/usr/bin/chromium'
+  };
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
 "
 
