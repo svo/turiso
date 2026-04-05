@@ -49,7 +49,12 @@ node -e "
     headless: true,
     noSandbox: true,
     executablePath: '/usr/bin/chromium',
-    userDataDir: process.env.HOME + '/.openclaw/chromium-data'
+    defaultProfile: 'default',
+    profiles: {
+      default: {
+        userDataDir: process.env.HOME + '/.openclaw/chromium-data'
+      }
+    }
   };
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
 "
