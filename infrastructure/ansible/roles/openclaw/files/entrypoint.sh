@@ -52,6 +52,8 @@ node -e "
     defaultProfile: 'default',
     profiles: {
       default: {
+        driver: 'existing-session',
+        attachOnly: true,
         userDataDir: process.env.HOME + '/.openclaw/chromium-data',
         color: '#4285F4'
       }
@@ -292,5 +294,14 @@ if [ -n "${TURISO_GOOGLE_COOKIES:-}" ]; then
   echo "Injecting Google cookies into browser profile..."
   NODE_PATH=$(npm root -g) node /usr/local/bin/inject-google-cookies.js
 fi
+
+/usr/bin/chromium --headless=new --no-sandbox --disable-setuid-sandbox \
+  --disable-blink-features=AutomationControlled \
+  --user-data-dir="$HOME/.openclaw/chromium-data" \
+  --remote-debugging-port=0 &
+
+while [ ! -f "$HOME/.openclaw/chromium-data/DevToolsActivePort" ]; do
+  sleep 0.5
+done
 
 exec openclaw gateway --port 3000 --bind lan
