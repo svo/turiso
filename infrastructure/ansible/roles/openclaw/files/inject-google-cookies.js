@@ -40,7 +40,6 @@ async function main() {
   try {
     const page = await browser.newPage();
 
-    // Filter to Google domain cookies only for safety
     const googleCookies = cookies.filter(c =>
       c.domain && (c.domain === '.google.com' || c.domain === 'google.com' ||
         c.domain.endsWith('.google.com'))
@@ -53,7 +52,6 @@ async function main() {
 
     await page.setCookie(...googleCookies);
 
-    // Navigate to google.com to establish the session in the profile
     await page.goto('https://www.google.com', { waitUntil: 'networkidle2', timeout: 30000 });
 
     console.log('Injected ' + googleCookies.length + ' Google cookies into ' + USER_DATA_DIR);

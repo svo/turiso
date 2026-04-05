@@ -278,8 +278,11 @@ if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
 fi
 
 
-# Inject Google session cookies into the browser profile if provided
 if [ -n "${TURISO_GOOGLE_COOKIES:-}" ]; then
+  if [ -f "${TURISO_GOOGLE_COOKIES}" ]; then
+    TURISO_GOOGLE_COOKIES=$(cat "${TURISO_GOOGLE_COOKIES}")
+    export TURISO_GOOGLE_COOKIES
+  fi
   echo "Injecting Google cookies into browser profile..."
   NODE_PATH=$(npm root -g) node /usr/local/bin/inject-google-cookies.js
 fi
