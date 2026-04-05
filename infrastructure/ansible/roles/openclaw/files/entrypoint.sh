@@ -52,7 +52,8 @@ node -e "
     defaultProfile: 'default',
     profiles: {
       default: {
-        userDataDir: process.env.HOME + '/.openclaw/chromium-data'
+        userDataDir: process.env.HOME + '/.openclaw/chromium-data',
+        color: '#4285F4'
       }
     }
   };
