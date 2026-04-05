@@ -52,9 +52,7 @@ node -e "
     defaultProfile: 'default',
     profiles: {
       default: {
-        driver: 'existing-session',
-        attachOnly: true,
-        userDataDir: process.env.HOME + '/.openclaw/chromium-data',
+        cdpUrl: 'http://127.0.0.1:9222',
         color: '#4285F4'
       }
     }
@@ -298,9 +296,9 @@ fi
 /usr/bin/chromium --headless=new --no-sandbox --disable-setuid-sandbox \
   --disable-blink-features=AutomationControlled \
   --user-data-dir="$HOME/.openclaw/chromium-data" \
-  --remote-debugging-port=0 &
+  --remote-debugging-port=9222 &
 
-while [ ! -f "$HOME/.openclaw/chromium-data/DevToolsActivePort" ]; do
+while ! curl -s -o /dev/null http://127.0.0.1:9222/json/version; do
   sleep 0.5
 done
 
