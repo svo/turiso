@@ -35,13 +35,6 @@ node -e "
       onlyMainContent: true
     };
   }
-  config.tools.browser = {
-    enabled: true,
-    mode: 'openclaw-managed',
-    headless: true,
-    chromiumPath: '/usr/bin/chromium',
-    launchArgs: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
-  };
   config.agents = config.agents || {};
   config.agents.defaults = config.agents.defaults || {};
   config.agents.defaults.skipBootstrap = true;
