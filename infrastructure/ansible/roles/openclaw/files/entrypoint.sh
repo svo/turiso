@@ -48,7 +48,8 @@ node -e "
     enabled: true,
     headless: true,
     noSandbox: true,
-    executablePath: '/usr/bin/chromium'
+    executablePath: '/usr/bin/chromium',
+    userDataDir: process.env.HOME + '/.openclaw/chromium-data'
   };
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
 "
@@ -56,8 +57,7 @@ node -e "
 required_vars=(
   TURISO_INSTAGRAM_USERNAME
   TURISO_INSTAGRAM_PASSWORD
-  TURISO_GOOGLE_EMAIL
-  TURISO_GOOGLE_PASSWORD
+  TURISO_GOOGLE_COOKIES
   TURISO_TIMEZONE
   TURISO_LOCALE
 )
@@ -127,8 +127,7 @@ The user sends a message naming an Instagram collection to sync (e.g. "Sync Chil
 
 Instagram username: ${TURISO_INSTAGRAM_USERNAME}
 Instagram password: ${TURISO_INSTAGRAM_PASSWORD}
-Google email: ${TURISO_GOOGLE_EMAIL}
-Google password: ${TURISO_GOOGLE_PASSWORD}
+Google: authenticated via pre-injected session cookies
 
 ## Workflow
 
@@ -146,12 +145,12 @@ Google password: ${TURISO_GOOGLE_PASSWORD}
 
 #### Google Maps
 1. Navigate to https://www.google.com/maps
-2. If there is no "Sign in" button visible, you are already logged in — skip to Step 2.
-3. If you see a "Sign in" button:
-   a. Click it and enter the Google email and password from the credentials above.
-   b. Complete any security prompts.
-4. If a two-factor authentication prompt appears, inform the user via Telegram and wait for
-   guidance.
+2. If there is no "Sign in" button visible, you are already logged in via pre-injected session
+   cookies — skip to Step 2.
+3. If you see a "Sign in" button, the session cookies have expired or were not injected correctly.
+   Inform the user that they need to re-export their Google session cookies and update the
+   TURISO_GOOGLE_COOKIES environment variable. Do not attempt to sign in via the browser — Google
+   blocks automated browser sign-in.
 
 ### Step 2: Scrape Instagram Collection
 
@@ -236,7 +235,8 @@ Send a summary message to the user:
   stop immediately and inform the user. Do not attempt to bypass CAPTCHAs.
 
 ### Login failures
-- If login fails (wrong password, account locked), report the error to the user and stop.
+- If Instagram login fails (wrong password, account locked), report the error to the user and stop.
+- If Google Maps shows a sign-in page, report that the session cookies need to be refreshed.
 
 ### Two-factor authentication
 - Report to the user and wait for them to provide the code or resolve the prompt.
@@ -246,8 +246,10 @@ Send a summary message to the user:
 - If the retry fails, report the error and continue with the next location.
 
 ### Session expiry mid-operation
-- If a session expires during the sync, re-authenticate using the credentials and resume from
-  where you left off.
+- If the Instagram session expires during the sync, re-authenticate using the credentials and
+  resume from where you left off.
+- If the Google Maps session expires, inform the user that cookies need to be refreshed and stop
+  the Google Maps sync.
 
 ## Important Notes
 
@@ -275,5 +277,11 @@ if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
   "
 fi
 
+
+# Inject Google session cookies into the browser profile if provided
+if [ -n "${TURISO_GOOGLE_COOKIES:-}" ]; then
+  echo "Injecting Google cookies into browser profile..."
+  NODE_PATH=$(npm root -g) node /usr/local/bin/inject-google-cookies.js
+fi
 
 exec openclaw gateway --port 3000 --bind lan

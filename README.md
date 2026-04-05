@@ -60,8 +60,7 @@ docker run -d \
   -e TELEGRAM_ALLOW_FROM="your-telegram-user-id" \
   -e TURISO_INSTAGRAM_USERNAME="your-instagram-username" \
   -e TURISO_INSTAGRAM_PASSWORD="your-instagram-password" \
-  -e TURISO_GOOGLE_EMAIL="your-google-email" \
-  -e TURISO_GOOGLE_PASSWORD="your-google-password" \
+  -e TURISO_GOOGLE_COOKIES='[{"name":"SID","value":"...","domain":".google.com","path":"/"}]' \
   -e TURISO_TIMEZONE="Australia/Melbourne" \
   -e TURISO_LOCALE="en-AU" \
   -v /opt/turiso/data:/root/.openclaw \
@@ -83,8 +82,7 @@ On first run, the entrypoint automatically configures OpenClaw via non-interacti
 | `TELEGRAM_ALLOW_FROM` | With `TELEGRAM_BOT_TOKEN` | Comma-separated Telegram user IDs to allow |
 | `TURISO_INSTAGRAM_USERNAME` | Yes | Instagram account username |
 | `TURISO_INSTAGRAM_PASSWORD` | Yes | Instagram account password |
-| `TURISO_GOOGLE_EMAIL` | Yes | Google account email for Google Maps |
-| `TURISO_GOOGLE_PASSWORD` | Yes | Google account password for Google Maps |
+| `TURISO_GOOGLE_COOKIES` | Yes | Google session cookies JSON (see [Cookie Authentication](#cookie-authentication)) |
 | `TURISO_TIMEZONE` | Yes | Timezone for user context |
 | `TURISO_LOCALE` | Yes | Spelling and language conventions |
 
@@ -108,8 +106,7 @@ docker run -d \
   -e TELEGRAM_ALLOW_FROM="your-telegram-user-id" \
   -e TURISO_INSTAGRAM_USERNAME="your-instagram-username" \
   -e TURISO_INSTAGRAM_PASSWORD="your-instagram-password" \
-  -e TURISO_GOOGLE_EMAIL="your-google-email" \
-  -e TURISO_GOOGLE_PASSWORD="your-google-password" \
+  -e TURISO_GOOGLE_COOKIES='[{"name":"SID","value":"...","domain":".google.com","path":"/"}]' \
   -e TURISO_TIMEZONE="Australia/Melbourne" \
   -e TURISO_LOCALE="en-AU" \
   -v /opt/turiso/data:/root/.openclaw \
@@ -145,9 +142,28 @@ These files are injected into the agent's context at the start of every session,
 
 ## Authentication
 
-Turiso uses environment variable credentials to log in to Instagram and Google Maps via headless Chromium browser automation. On first run, the agent logs in and the browser session (cookies, local storage) is persisted in the Docker volume at `/root/.openclaw`. Subsequent runs reuse the existing session when possible.
+### Instagram
+
+Turiso logs in to Instagram using `TURISO_INSTAGRAM_USERNAME` and `TURISO_INSTAGRAM_PASSWORD` via headless Chromium. The browser session is persisted in the Docker volume at `/root/.openclaw` so subsequent runs reuse the existing session when possible.
 
 If two-factor authentication is triggered during login, the agent will inform you via Telegram and wait for you to provide the verification code.
+
+### Google Maps
+
+Google blocks sign-in from automated browsers with a "This browser or app may not be secure" error. Turiso works around this by injecting session cookies exported from a real browser, so the agent never touches the Google sign-in page.
+
+#### Cookie Authentication
+
+Export session cookies from a real browser and pass them as `TURISO_GOOGLE_COOKIES`. The cookies are injected into the Chromium profile at startup, so the agent sees an already-authenticated session.
+
+**How to export cookies:**
+
+1. Sign into your Google account in a regular desktop browser (Chrome, Firefox, etc.)
+2. Install a cookie export extension (e.g. [Export cookie JSON file for Puppeteer](https://chromewebstore.google.com/detail/export-cookie-json-file-f/nmckokihipjgplolmcmjakknndddifde) for Chrome)
+3. Navigate to `https://www.google.com` and export cookies
+4. Pass the JSON array as the `TURISO_GOOGLE_COOKIES` environment variable
+
+Google session cookies typically last around 2 years. When they expire, repeat the export process.
 
 ## Limitations
 

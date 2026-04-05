@@ -5,9 +5,23 @@
     global: true
   become: true
 
+- name: Install puppeteer-core
+  community.general.npm:
+    name: puppeteer-core
+    state: latest
+    global: true
+  become: true
+
 - name: Install entrypoint script
   ansible.builtin.copy:
     src: entrypoint.sh
     dest: /usr/local/bin/entrypoint.sh
     mode: '0755'
+  become: true
+
+- name: Install cookie injection script
+  ansible.builtin.copy:
+    src: inject-google-cookies.js
+    dest: /usr/local/bin/inject-google-cookies.js
+    mode: '0644'
   become: true
