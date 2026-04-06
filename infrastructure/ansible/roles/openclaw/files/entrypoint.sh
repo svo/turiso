@@ -63,7 +63,6 @@ node -e "
 required_vars=(
   TURISO_INSTAGRAM_USERNAME
   TURISO_INSTAGRAM_PASSWORD
-  TURISO_GOOGLE_COOKIES
   TURISO_TIMEZONE
   TURISO_LOCALE
 )
@@ -409,13 +408,9 @@ if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
 fi
 
 
-if [ -n "${TURISO_GOOGLE_COOKIES:-}" ]; then
-  if [ -f "${TURISO_GOOGLE_COOKIES}" ]; then
-    TURISO_GOOGLE_COOKIES=$(cat "${TURISO_GOOGLE_COOKIES}")
-    export TURISO_GOOGLE_COOKIES
-  fi
-  echo "Injecting Google cookies into browser profile..."
-  NODE_PATH=$(npm root -g) node /usr/local/bin/inject-google-cookies.js
+if [ -n "${TURISO_GOOGLE_COOKIES:-}" ] && [ -f "${TURISO_GOOGLE_COOKIES}" ]; then
+  TURISO_GOOGLE_COOKIES=$(cat "${TURISO_GOOGLE_COOKIES}")
+  export TURISO_GOOGLE_COOKIES
 fi
 
 /usr/bin/chromium --headless=new --no-sandbox --disable-setuid-sandbox \
@@ -426,5 +421,8 @@ fi
 while ! curl -s -o /dev/null http://127.0.0.1:9222/json/version; do
   sleep 0.5
 done
+
+echo "Checking Google session..."
+NODE_PATH=$(npm root -g) node /usr/local/bin/inject-google-cookies.js || true
 
 exec openclaw gateway --port 3000 --bind lan
