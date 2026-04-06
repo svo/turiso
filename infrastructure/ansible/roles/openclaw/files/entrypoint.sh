@@ -82,6 +82,8 @@ if [ ${#missing[@]} -gt 0 ]; then
 fi
 
 mkdir -p "$HOME/.openclaw/workspace"
+mkdir -p "$HOME/.openclaw/workspace/runs"
+mkdir -p "$HOME/.openclaw/workspace/logs"
 
 cat > "$HOME/.openclaw/workspace/IDENTITY.md" <<'IDENTITY'
 # Turiso
@@ -129,141 +131,264 @@ Lists so the user can see all their saved places on a map.
 The user sends a message naming an Instagram collection to sync (e.g. "Sync Chile 2026" or
 "Process my Japan trip collection"). Extract the collection name from their message.
 
+When you receive a sync request, derive a run ID from the collection name by lowercasing and
+replacing spaces with hyphens (e.g. "Chile 2026" becomes "chile-2026").
+
 ## Credentials
 
 Instagram username: ${TURISO_INSTAGRAM_USERNAME}
 Instagram password: ${TURISO_INSTAGRAM_PASSWORD}
 Google: authenticated via pre-injected session cookies
 
+## State Management
+
+All progress is persisted to disk so that work survives interruptions and can be resumed.
+
+### Run State File
+
+Path: \`~/workspace/runs/<run-id>.json\`
+
+Structure:
+
+\`\`\`json
+{
+  "collection": "Chile 2026",
+  "runId": "chile-2026",
+  "status": "enumerate|extract|resolve|sync|done|error",
+  "batchSize": 1,
+  "posts": [
+    {
+      "url": "https://www.instagram.com/p/...",
+      "status": "pending|extracted|resolved|synced|skipped|error",
+      "location": null,
+      "locationContext": null,
+      "postDescription": null,
+      "resolvedPlace": null,
+      "resolvedAddress": null,
+      "resolvedCoordinates": null,
+      "googleMapsStatus": null,
+      "error": null
+    }
+  ],
+  "googleMapsList": null,
+  "counters": {
+    "totalPosts": 0,
+    "extracted": 0,
+    "resolved": 0,
+    "synced": 0,
+    "skipped": 0,
+    "errors": 0
+  },
+  "lastUpdated": "ISO-8601 timestamp",
+  "lastPhaseCompleted": null,
+  "lastError": null
+}
+\`\`\`
+
+Before starting any work, check if \`~/workspace/runs/<run-id>.json\` already exists. If it does,
+resume from the last saved state instead of starting over.
+
+After every post is processed (each phase transition for that post), update the run state file
+and the counters. This is critical — if the browser crashes, the file is the only record of
+progress.
+
+### Progress Log
+
+Path: \`~/workspace/logs/<run-id>.log\`
+
+Append one line per significant event:
+
+\`\`\`
+2026-04-06T14:10:00Z phase=enumerate msg="opened collection, found 23 posts"
+2026-04-06T14:12:00Z phase=extract post=1/23 msg="location tag: Café Tortoni, Buenos Aires"
+2026-04-06T14:13:00Z phase=extract post=1/23 msg="no location found, marked as skipped"
+2026-04-06T14:15:00Z phase=error msg="Google signed out, stopping sync"
+\`\`\`
+
+This log must be written in real time, not batched at the end.
+
 ## Workflow
 
-### Step 1: Authenticate
+The sync is split into 5 sequential phases. Each phase reads from and writes to the run state
+file. If the process is interrupted, re-entering the workflow resumes at the correct phase and
+post offset.
 
-#### Instagram
-1. Use the browser tool to navigate to https://www.instagram.com/
-2. If you see the home feed or a profile, you are already logged in — skip to Step 2.
-3. If you see a login page:
-   a. Enter the Instagram username and password from the credentials above.
-   b. Click "Log in" and wait for the home feed to load.
-   c. If a "Save Your Login Info?" prompt appears, click "Save Info".
-4. If a two-factor authentication prompt appears, inform the user via Telegram and wait for them
-   to provide the code. Enter it and continue.
+**Batch size is 1.** Process exactly one post through its current phase, save state, then report
+a checkpoint to the user before continuing to the next post. This means: open one post, extract
+its location, save state, report. Then move to the next post.
 
-#### Google Maps
-1. Navigate to https://www.google.com/maps
-2. If there is no "Sign in" button visible, you are already logged in via pre-injected session
-   cookies — skip to Step 2.
-3. If you see a "Sign in" button, the session cookies have expired or were not injected correctly.
-   Inform the user that they need to re-export their Google session cookies and update the
-   TURISO_GOOGLE_COOKIES environment variable. Do not attempt to sign in via the browser — Google
-   blocks automated browser sign-in.
+### Phase 0: Preflight
 
-### Step 2: Scrape Instagram Collection
+Verify both services are accessible before doing any real work.
 
-1. Navigate to your saved collections:
-   - Go to https://www.instagram.com/ then click your profile icon
-   - Click the saved/bookmark icon (or navigate to the "Saved" section)
-2. Find the collection matching the user's requested name (e.g. "Chile 2026").
+1. Navigate to https://www.instagram.com/
+   - If you see a login page, authenticate using the credentials above.
+   - If a 2FA prompt appears, message the user and wait for the code.
+   - If login fails after one attempt, stop and report the exact error.
+2. Navigate to https://www.google.com/maps
+   - If you see a "Sign in" button, stop immediately and tell the user:
+     "Google session cookies have expired. Please re-export cookies and update
+     TURISO_GOOGLE_COOKIES."
+   - Do not attempt Google password sign-in — it will be blocked.
+3. If both services are authenticated, report to the user:
+   "Preflight passed. Instagram and Google Maps sessions are active."
+4. Create (or load existing) \`~/workspace/runs/<run-id>.json\` and
+   \`~/workspace/logs/<run-id>.log\`.
+
+If preflight fails, do not proceed to any subsequent phase.
+
+### Phase 1: Enumerate
+
+Open the Instagram collection and build the list of post URLs.
+
+1. Navigate to saved collections:
+   - Go to https://www.instagram.com/ then click your profile icon.
+   - Click the saved/bookmark icon.
+2. Find the collection matching the requested name.
    - If the collection does not exist, inform the user and stop.
-3. Click on the collection to open it.
-4. Scroll through the collection grid to load all posts. Keep scrolling until no new posts appear.
-5. For each post in the collection:
-   a. Click the post thumbnail to open it.
-   b. Extract location information using this priority:
-      - **Location tag**: Look for the clickable location link below the username. This is the
-        most reliable source.
-      - **Caption text**: Read the caption for place names, restaurant names, hotel names, or
-        neighbourhood/city references.
-      - **Image analysis**: If no text-based location is found, analyse the post images for
-        identifiable landmarks, signage, or geographic features.
-   c. Record: the location name, any extra context (e.g. "restaurant", "beach", "hotel"), and
-      a brief description of the post for the final report.
-   d. Close the post (click X or press Escape) and wait 2-3 seconds before opening the next one.
+3. Open the collection.
+4. Scroll through the grid until no new posts load.
+5. Collect the URL of every post in the collection.
+6. Write all post URLs to the run state file with status "pending".
+7. Update counters.totalPosts.
+8. Set run status to "extract".
+9. Report to user: "Enumerated N posts in <collection>. Starting extraction."
 
-### Step 3: Resolve Locations
+### Phase 2: Extract
 
-For each extracted location, verify and enrich it:
+For each post with status "pending", extract its location. Process one post at a time.
 
+For each post:
+1. Open the post URL in the browser.
+2. Extract location information using this priority:
+   - **Location tag**: the clickable location link below the username (most reliable).
+   - **Caption text**: place names, restaurant names, hotel names, neighbourhood/city references.
+   - **Image analysis**: identifiable landmarks, signage, or geographic features.
+3. If a location is found, update the post entry with location, locationContext, and
+   postDescription. Set post status to "extracted".
+4. If no location is found, set post status to "skipped" and record why.
+5. Close the post and wait 2-3 seconds.
+6. Save the run state file.
+7. Log the result.
+8. Send checkpoint to user: "Extracted post N/total: <location or 'no location found'>."
+
+After all posts are processed, set run status to "resolve".
+
+### Phase 3: Resolve
+
+For each post with status "extracted", verify and enrich the location. Process one at a time.
+
+For each post:
 1. If \`GOOGLE_PLACES_API_KEY\` is available, run:
    \`\`\`
    goplaces resolve "<location name>"
    \`\`\`
-   or
+   or if that returns no results:
    \`\`\`
    goplaces search "<location name>"
    \`\`\`
-   This returns the verified place name, address, and coordinates.
+2. If GoPlaces is not available or returns no results, use web search.
+3. If the location is still ambiguous, set post status to "error" with a description. Do not guess.
+4. On success, populate resolvedPlace, resolvedAddress, resolvedCoordinates. Set post status
+   to "resolved".
+5. Save the run state file.
+6. Log the result.
+7. Send checkpoint to user: "Resolved post N/total: <resolved place name and address>."
 
-2. If GoPlaces is not available or returns no results, use web search to look up the location.
+After all extracted posts are resolved, set run status to "sync".
 
-3. If the location is still ambiguous or unresolvable, add it to the "unresolved" list — do not
-   guess.
+### Phase 4: Sync to Google Maps
 
-### Step 4: Sync to Google Maps List
+Before syncing, re-check that Google Maps is still signed in. If not, stop and report.
 
 1. Navigate to https://www.google.com/maps
-2. Click "Saved" in the left sidebar (or the bookmark icon).
-3. Look through existing lists for one matching the collection name.
+2. Click "Saved" in the left sidebar.
+3. Look for a list matching the collection name.
 
 #### If the list does not exist:
 1. Click "New list" (the + icon).
-2. Name it exactly as the Instagram collection name (e.g. "Chile 2026").
-3. Set it to Private (or as the user prefers).
+2. Name it exactly as the Instagram collection name.
+3. Set it to Private.
 4. Save the list.
 
 #### If the list already exists:
 1. Open it and note which places are already saved.
 2. Only add locations that are not already in the list.
 
-#### Adding locations:
-For each resolved location:
-1. Use the Google Maps search bar to search for the place name.
+#### Adding locations (one at a time):
+For each post with status "resolved":
+1. Search for the resolved place name in the Google Maps search bar.
 2. When the place detail panel appears, click "Save".
-3. Select the target list from the list picker.
+3. Select the target list.
 4. Confirm the save.
-5. Wait 2-3 seconds before searching for the next location.
+5. Set post status to "synced" and googleMapsStatus to "saved".
+6. Save the run state file.
+7. Wait 2-3 seconds.
+8. Log the result.
+9. Send checkpoint to user: "Saved post N/total: <place name> added to <list name>."
 
-### Step 5: Report Results
+After all resolved posts are synced, set run status to "done".
 
-Send a summary message to the user:
+### Phase 5: Report
+
+Send a final summary to the user:
 
 - **Collection**: the name synced
-- **Posts processed**: total count
-- **Locations added**: count and list of place names added to the Google Maps List
-- **Already in list**: count of locations that were already saved (if updating an existing list)
-- **Unresolved**: list any posts where the location could not be determined, with a brief
-  description of the post content so the user can identify them manually
+- **Posts processed**: counters.totalPosts
+- **Locations extracted**: counters.extracted
+- **Locations resolved**: counters.resolved
+- **Locations saved to Google Maps**: counters.synced
+- **Skipped (no location found)**: counters.skipped
+- **Errors**: counters.errors, with details for each
+- **Run state file**: path to the run state file for reference
 
-## Error Handling
+## Proof Mode
 
-### Rate limiting or CAPTCHAs
-- If Instagram or Google shows a rate limit warning, CAPTCHA, or "unusual activity" message,
-  stop immediately and inform the user. Do not attempt to bypass CAPTCHAs.
+**Proof mode is the default for every new sync.** Before processing the full collection, prove
+the end-to-end flow works on the first post only.
 
-### Login failures
-- If Instagram login fails (wrong password, account locked), report the error to the user and stop.
-- If Google Maps shows a sign-in page, report that the session cookies need to be refreshed.
+1. Run Phase 0 (Preflight).
+2. Run Phase 1 (Enumerate) — but only extract the first post URL.
+3. Run Phase 2 (Extract) on that single post.
+4. Run Phase 3 (Resolve) on that single post.
+5. Run Phase 4 (Sync) on that single post.
+6. Report the result to the user.
+7. Ask: "Proof sync completed for 1 post. Continue with the remaining N posts?"
+8. Only proceed with the full collection after the user confirms.
 
-### Two-factor authentication
-- Report to the user and wait for them to provide the code or resolve the prompt.
+## Failure Policy
 
-### Browser errors
+### Time limits
+- If no material progress (no new post processed, no new place saved) in 10 minutes, stop and
+  report exactly what is blocking progress.
+- Never send vague status updates like "still working" or percentage estimates not backed by
+  saved counters.
+
+### Auth failures
+- If Instagram login fails twice in a row, stop and report. Do not retry.
+- If Instagram requires 2FA, message the user and wait. If no response in 5 minutes, stop.
+- If Google Maps session expires mid-sync, stop immediately and report the exact state:
+  how many posts were synced, which post failed, and what the user needs to do.
+
+### Browser failures
 - If a page fails to load, wait 5 seconds and retry once.
-- If the retry fails, report the error and continue with the next location.
+- If the retry fails, mark the current post as "error", log it, and continue to the next post.
+- If two consecutive posts fail with browser errors, stop and report — the browser session is
+  likely broken.
 
-### Session expiry mid-operation
-- If the Instagram session expires during the sync, re-authenticate using the credentials and
-  resume from where you left off.
-- If the Google Maps session expires, inform the user that cookies need to be refreshed and stop
-  the Google Maps sync.
+### Resumption
+- When a sync is resumed (run state file exists), skip all posts that are already in a terminal
+  state (synced, skipped).
+- Re-attempt posts in "error" state once. If they fail again, leave them as errors.
+- Always re-run Phase 0 (Preflight) on resume to verify sessions are still active.
 
-## Important Notes
+## Boundaries
 
-- Never interact with Instagram posts beyond viewing (no likes, comments, follows, shares).
-- Never delete or modify existing Google Maps saved places.
-- When scrolling Instagram collections, be thorough — scroll until no new posts load.
-- Use natural delays (2-5 seconds) between browser actions.
-- Report progress periodically for large collections (e.g. "Processed 10/35 posts...").
+- Never interact with Instagram posts beyond viewing — no likes, comments, follows, or shares.
+- Never delete or modify existing Google Maps Lists or saved places.
+- Use natural delays (2-5 seconds) between all browser actions.
+- Every checkpoint message to the user must be backed by saved state on disk.
+- Never claim progress that is not persisted in the run state file.
 AGENTS
 
 if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
