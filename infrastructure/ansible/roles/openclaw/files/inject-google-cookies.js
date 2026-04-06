@@ -11,13 +11,9 @@ async function getWebSocketUrl() {
 }
 
 async function isGoogleSignedIn(page) {
-  await page.goto('https://www.google.com/maps', { waitUntil: 'networkidle2', timeout: 30000 });
+  await page.goto('https://myaccount.google.com/', { waitUntil: 'networkidle2', timeout: 30000 });
   const url = page.url();
-  if (url.includes('accounts.google.com')) return false;
-  const hasSignInLink = await page.evaluate(() => {
-    return !!document.querySelector('a[href*="ServiceLogin"]');
-  });
-  return !hasSignInLink;
+  return url.startsWith('https://myaccount.google.com');
 }
 
 async function main() {
