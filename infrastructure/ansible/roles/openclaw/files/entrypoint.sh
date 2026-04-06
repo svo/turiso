@@ -23,16 +23,26 @@ node -e "
     readability: true
   };
   if (process.env.BRAVE_API_KEY) {
-    config.tools.web.search = {
-      enabled: true,
-      apiKey: process.env.BRAVE_API_KEY
+    config.tools.web.search = { provider: 'brave' };
+    config.plugins = config.plugins || {};
+    config.plugins.entries = config.plugins.entries || {};
+    config.plugins.entries.brave = {
+      config: {
+        webSearch: { apiKey: process.env.BRAVE_API_KEY }
+      }
     };
   }
   if (process.env.FIRECRAWL_API_KEY) {
-    config.tools.web.fetch.firecrawl = {
+    config.plugins = config.plugins || {};
+    config.plugins.entries = config.plugins.entries || {};
+    config.plugins.entries.firecrawl = {
       enabled: true,
-      apiKey: process.env.FIRECRAWL_API_KEY,
-      onlyMainContent: true
+      config: {
+        webFetch: {
+          apiKey: process.env.FIRECRAWL_API_KEY,
+          onlyMainContent: true
+        }
+      }
     };
   }
   config.agents = config.agents || {};
