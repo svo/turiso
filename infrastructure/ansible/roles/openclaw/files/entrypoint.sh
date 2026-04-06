@@ -27,6 +27,7 @@ node -e "
     config.plugins = config.plugins || {};
     config.plugins.entries = config.plugins.entries || {};
     config.plugins.entries.brave = {
+      enabled: true,
       config: {
         webSearch: { apiKey: process.env.BRAVE_API_KEY }
       }
